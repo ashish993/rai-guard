@@ -274,7 +274,7 @@ raiguard check "DROP TABLE users;"  # exit 1
 ## Contributing
 
 ```bash
-git clone https://github.com/YOUR_GITHUB_USERNAME/rai-guard
+git clone https://github.com/ashish993/rai-guard
 cd rai-guard
 pip install -e ".[dev]"
 pytest tests/

@@ -12,7 +12,7 @@
 
 To report a vulnerability:
 
-1. Open a [GitHub Security Advisory](https://github.com/YOUR_GITHUB_USERNAME/rai-guard/security/advisories/new) (preferred — keeps the report private until fixed).
+1. Open a [GitHub Security Advisory](https://github.com/ashish993/rai-guard/security/advisories/new) (preferred — keeps the report private until fixed).
 2. Or email the maintainer directly (see the email in `pyproject.toml`).
 
 Please include:

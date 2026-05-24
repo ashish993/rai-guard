@@ -7,7 +7,7 @@ Thank you for helping make AI systems safer and more compliant. Contributions of
 ## Getting Started
 
 ```bash
-git clone https://github.com/YOUR_GITHUB_USERNAME/rai-guard
+git clone https://github.com/ashish993/rai-guard
 cd rai-guard
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
@@ -99,7 +99,7 @@ chore: bump fastapi to 0.115
 
 ## Reporting Bugs
 
-Please open a [GitHub Issue](https://github.com/YOUR_GITHUB_USERNAME/rai-guard/issues) with:
+Please open a [GitHub Issue](https://github.com/ashish993/rai-guard/issues) with:
 - Python version and OS
 - Minimal reproducing example
 - Expected vs. actual behaviour
