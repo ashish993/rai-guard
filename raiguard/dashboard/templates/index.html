@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rai-guard Dashboard</title>
+<style>
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --border: #334155;
+    --text: #e2e8f0; --muted: #94a3b8;
+    --green: #22c55e; --red: #ef4444; --amber: #f59e0b; --blue: #3b82f6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+  .topbar h1 { font-size: 1.25rem; font-weight: 700; }
+  .topbar h1 span { color: var(--blue); }
+  .badge-live { background: var(--green); color: #052e16; font-size: 0.7rem; font-weight: 700; padding: .15rem .5rem; border-radius: 9999px; }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: .5rem; padding: 1.25rem; }
+  .card .label { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: .4rem; }
+  .card .value { font-size: 2rem; font-weight: 700; }
+  .card .sub { font-size: .8rem; color: var(--muted); margin-top: .25rem; }
+  .green { color: var(--green); }
+  .red { color: var(--red); }
+  .amber { color: var(--amber); }
+  .blue { color: var(--blue); }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 2rem; }
+
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: .5rem; padding: 1.5rem; }
+  .panel h2 { font-size: .95rem; font-weight: 600; margin-bottom: 1rem; color: var(--text); }
+
+  .score-row { display: flex; align-items: center; gap: .75rem; padding: .5rem 0; border-bottom: 1px solid var(--border); }
+  .score-row:last-child { border-bottom: none; }
+  .score-id { font-size: .75rem; font-weight: 700; color: var(--muted); width: 60px; flex-shrink: 0; }
+  .score-name { font-size: .85rem; flex: 1; }
+  .score-bar-wrap { width: 100px; background: var(--border); border-radius: 9999px; height: 6px; }
+  .score-bar { height: 6px; border-radius: 9999px; }
+  .bar-green { background: var(--green); }
+  .bar-amber { background: var(--amber); }
+  .bar-red { background: var(--red); }
+  .score-pct { font-size: .8rem; font-weight: 600; width: 40px; text-align: right; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .825rem; }
+  th { padding: .5rem .75rem; text-align: left; color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--border); }
+  td { padding: .55rem .75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .ts { font-family: monospace; font-size: .75rem; color: var(--muted); }
+  .chip { display: inline-block; padding: .1rem .45rem; border-radius: 9999px; font-size: .7rem; font-weight: 600; }
+  .chip-green { background: #14532d; color: var(--green); }
+  .chip-red { background: #450a0a; color: var(--red); }
+  .chip-amber { background: #422006; color: var(--amber); }
+
+  .empty { text-align: center; color: var(--muted); padding: 2rem; font-size: .9rem; }
+
+  @media (max-width: 768px) {
+    .grid-4, .grid-2 { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>rai<span>-guard</span> Dashboard</h1>
+  <span class="badge-live">LIVE</span>
+</div>
+
+<div class="container">
+
+  <!-- KPI cards -->
+  <div class="grid-4">
+    <div class="card">
+      <div class="label">Total Requests</div>
+      <div class="value blue">{{ stats.total_requests }}</div>
+      <div class="sub">lifetime</div>
+    </div>
+    <div class="card">
+      <div class="label">Blocked</div>
+      <div class="value red">{{ stats.blocked_requests }}</div>
+      <div class="sub">policy violations</div>
+    </div>
+    <div class="card">
+      <div class="label">Pass Rate</div>
+      <div class="value {% if stats.pass_rate >= 95 %}green{% elif stats.pass_rate >= 75 %}amber{% else %}red{% endif %}">
+        {{ stats.pass_rate }}%
+      </div>
+      <div class="sub">requests allowed</div>
+    </div>
+    <div class="card">
+      <div class="label">Avg Risk Score</div>
+      <div class="value {% if stats.average_risk_score < 0.3 %}green{% elif stats.average_risk_score < 0.6 %}amber{% else %}red{% endif %}">
+        {{ "%.3f"|format(stats.average_risk_score) }}
+      </div>
+      <div class="sub">0 = safe, 1 = critical</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+
+    <!-- OWASP panel -->
+    <div class="panel">
+      <h2>OWASP LLM Top 10 — Compliance Score
+        <span style="float:right;font-size:1.2rem;font-weight:700"
+          class="{% if owasp_score.grade == 'A' %}green{% elif owasp_score.grade == 'B' %}blue{% elif owasp_score.grade == 'C' %}amber{% else %}red{% endif %}">
+          {{ owasp_score.score }}% &nbsp; Grade {{ owasp_score.grade }}
+        </span>
+      </h2>
+
+      {% set owasp_cats = [
+        ("LLM01","Prompt Injection"),("LLM02","Insecure Output"),("LLM03","Training Poisoning"),
+        ("LLM04","Model DoS"),("LLM05","Supply Chain"),("LLM06","PII Disclosure"),
+        ("LLM07","Insecure Plugins"),("LLM08","Excessive Agency"),("LLM09","Hallucination"),("LLM10","Model Theft")
+      ] %}
+
+      {% for cat_id, cat_name in owasp_cats %}
+      <div class="score-row">
+        <div class="score-id">{{ cat_id }}</div>
+        <div class="score-name">{{ cat_name }}</div>
+        <div class="score-bar-wrap">
+          <div class="score-bar bar-green" style="width:{{ owasp_score.score }}%"></div>
+        </div>
+        <div class="score-pct green">{{ owasp_score.score }}%</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- EU AI Act panel -->
+    <div class="panel">
+      <h2>EU AI Act — Compliance
+        <span style="float:right;font-size:1.2rem;font-weight:700"
+          class="{% if eu_score.grade == 'A' %}green{% elif eu_score.grade == 'B' %}blue{% elif eu_score.grade == 'C' %}amber{% else %}red{% endif %}">
+          {{ eu_score.score }}% &nbsp; Grade {{ eu_score.grade }}
+        </span>
+      </h2>
+
+      {% set articles = [
+        ("Art. 9","Risk Management"),("Art. 10","Data Governance"),
+        ("Art. 12","Record-Keeping"),("Art. 13","Transparency"),
+        ("Art. 14","Human Oversight"),("Art. 15","Accuracy & Robustness"),("Art. 17","Quality Management")
+      ] %}
+
+      {% for art_id, art_name in articles %}
+      <div class="score-row">
+        <div class="score-id" style="width:55px">{{ art_id }}</div>
+        <div class="score-name">{{ art_name }}</div>
+        <div class="score-bar-wrap">
+          <div class="score-bar bar-green" style="width:{{ eu_score.score }}%"></div>
+        </div>
+        <div class="score-pct green">{{ eu_score.score }}%</div>
+      </div>
+      {% endfor %}
+    </div>
+
+  </div>
+
+  <!-- Recent requests -->
+  <div class="panel">
+    <h2>Recent Requests</h2>
+    {% if recent %}
+    <table>
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Direction</th>
+          <th>Risk Score</th>
+          <th>Status</th>
+          <th>Session</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in recent %}
+        <tr>
+          <td class="ts">{{ row.timestamp[:19].replace("T"," ") }}</td>
+          <td>{{ row.direction }}</td>
+          <td>
+            <span class="{% if row.risk_score < 0.3 %}green{% elif row.risk_score < 0.6 %}amber{% else %}red{% endif %}">
+              {{ "%.3f"|format(row.risk_score) }}
+            </span>
+          </td>
+          <td>
+            {% if row.passed %}
+            <span class="chip chip-green">PASS</span>
+            {% else %}
+            <span class="chip chip-red">BLOCK</span>
+            {% endif %}
+          </td>
+          <td class="ts">{{ row.session_id[:8] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">No requests recorded yet. Start using rai-guard to see live data here.</div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+  // Auto-refresh stats every 10 seconds
+  setInterval(async () => {
+    try {
+      const r = await fetch('/api/stats');
+      const d = await r.json();
+      // Lightweight update without full page reload would go here
+    } catch (e) {}
+  }, 10000);
+</script>
+</body>
+</html>

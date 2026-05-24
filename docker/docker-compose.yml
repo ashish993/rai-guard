@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  raiguard-proxy:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      # Set to http://host.docker.internal:11434 when using Ollama on the host
+      RAI_UPSTREAM_URL: ${RAI_UPSTREAM_URL:-https://api.openai.com}
+      RAI_BLOCK_ON_FAIL: ${RAI_BLOCK_ON_FAIL:-true}
+      RAI_SCORE_THRESHOLD: ${RAI_SCORE_THRESHOLD:-0.7}
+      RAI_DB_PATH: /data/raiguard_audit.db
+    volumes:
+      - raiguard-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  raiguard-dashboard:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: uvicorn raiguard.dashboard.app:app --host 0.0.0.0 --port 8080
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      RAI_DB_PATH: /data/raiguard_audit.db
+    volumes:
+      - raiguard-data:/data
+    restart: unless-stopped
+    depends_on:
+      - raiguard-proxy
+
+volumes:
+  raiguard-data:

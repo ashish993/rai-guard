@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+*.coverage
+coverage.xml
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+.pytype/
+
+# Databases (generated at runtime — never commit audit data)
+*.db
+*.sqlite
+*.sqlite3
+
+# Compliance reports (generated at runtime)
+raiguard_report.*
+compliance_report.*
+
+# Environment / secrets
+.env
+.env.*
+*.secret
+secrets/
+
+# Editor & OS
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Build / packaging
+.hatch/
+*.tar.gz
+
+# Demo assets (generated locally)
+docs/demo.gif
+docs/demo.cast
