@@ -20,7 +20,7 @@ _OUTPUT_RISKS: list[tuple[str, str, Severity]] = [
     # SQL injection payloads
     (r"(?i)\b(SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|EXEC|UNION)\b.*\b(FROM|WHERE|TABLE|INTO|DATABASE)\b",
      "sql_query_in_output", Severity.HIGH),
-    (r"(?i)('\s*OR\s*'1'\s*=\s*'1|'\s*;\s*DROP\s+TABLE|1\s*=\s*1\s*--)",
+    (r"(?i)('\s*OR\s*'1'\s*=\s*'1|'\s*;\s*DROP\s+TABLE|1\s*=\s*1[\s;]*--|xp_cmdshell|'\s*OR\s*\d+\s*=\s*\d+)",
      "sql_injection_payload", Severity.CRITICAL),
 
     # XSS
@@ -28,8 +28,16 @@ _OUTPUT_RISKS: list[tuple[str, str, Severity]] = [
      "xss_script_tag", Severity.CRITICAL),
     (r"(?i)javascript\s*:[^\s]",
      "xss_javascript_protocol", Severity.HIGH),
-    (r"(?i)on(load|click|error|mouseover|focus|blur)\s*=\s*['\"]",
+    (r"(?i)on(load|click|error|mouseover|focus|blur)\s*=",
      "xss_event_handler", Severity.HIGH),
+
+    # Template injection
+    (r"\$\{[^}]+\}|\{\{[^}]+\}\}",
+     "template_injection", Severity.HIGH),
+
+    # JS fetch/exfil with parens or URL
+    (r"(?i)fetch\s*\(?['\"]?https?://",
+     "js_fetch_exfil", Severity.HIGH),
 
     # Shell injection
     (r"(?:;|\||&&|\$\(|`)\s*(?:rm|wget|curl|bash|sh|python|nc|netcat|ncat)\s",
@@ -40,7 +48,7 @@ _OUTPUT_RISKS: list[tuple[str, str, Severity]] = [
     # Path traversal
     (r"(?:\.\./){2,}|(?:\.\.\\){2,}",
      "path_traversal", Severity.HIGH),
-    (r"(?i)/etc/passwd|/etc/shadow|/proc/self|C:\\Windows\\System32",
+    (r"(?i)/etc/(?:passwd|shadow|cron|crontab|sudoers|hosts|ssh)|/proc/self|C:\\Windows\\System32",
      "sensitive_path_reference", Severity.CRITICAL),
 
     # SSRF-prone patterns
@@ -66,7 +74,31 @@ class InsecureOutputCheck(BaseCheck):
         self.threshold = threshold
 
     def check_input(self, text: str, context: dict[str, Any] | None = None) -> CheckResult:
-        return self._make_result(True, 0.0, Severity.LOW)  # Input-side not applicable
+        """Block SQL/shell injection payloads in user prompts (OWASP LLM01 / A03)."""
+        if not text:
+            return self._make_result(True, 0.0, Severity.LOW)
+        matches = []
+        severity_scores = {Severity.LOW: 0.1, Severity.MEDIUM: 0.4,
+                           Severity.HIGH: 0.7, Severity.CRITICAL: 1.0}
+        max_score = 0.0
+        max_sev = Severity.LOW
+        for compiled, label, sev in _COMPILED_OUTPUT:
+            if compiled.search(text):
+                score = severity_scores[sev]
+                matches.append({"pattern": label, "severity": sev.value})
+                if score > max_score:
+                    max_score = score
+                    max_sev = sev
+        if not matches:
+            return self._make_result(True, 0.0, Severity.LOW)
+        return self._make_result(
+            passed=max_score < self.threshold,
+            score=max_score,
+            severity=max_sev,
+            details={"matches": matches},
+            patterns=[m["pattern"] for m in matches],
+            remediation="Reject user input containing injection patterns. Sanitise before passing to any downstream system.",
+        )
 
     def check_output(self, text: str, prompt: str = "", context: dict[str, Any] | None = None) -> CheckResult:
         if not text:
@@ -102,3 +134,32 @@ class InsecureOutputCheck(BaseCheck):
                 "Sanitize all LLM-generated code before execution (OWASP LLM02)."
             ),
         )
+
+    def fix(self, text: str) -> str:
+        """Sanitize dangerous patterns from LLM output.
+
+        - Strips <script> tags and JS event handlers (XSS)
+        - Escapes SQL keywords in dangerous contexts
+        - Removes shell injection characters
+        - Replaces internal SSRF URLs with [BLOCKED:URL]
+        """
+        import re as _re
+        result = text
+
+        # Strip <script>...</script> blocks
+        result = _re.sub(r'<script[^>]*>.*?</script>', '[REMOVED:SCRIPT]', result, flags=_re.IGNORECASE | _re.DOTALL)
+        # Strip JS event handlers from HTML attributes
+        result = _re.sub(r'\s+on\w+\s*=\s*["\'][^"\']*["\']', '', result, flags=_re.IGNORECASE)
+        # Replace javascript: URIs
+        result = _re.sub(r'javascript\s*:', 'javascript_blocked:', result, flags=_re.IGNORECASE)
+        # Block internal SSRF URLs
+        result = _re.sub(
+            r'(?i)(?:http|ftp|file|dict|ldap)://(?:169\.254\.169\.254|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+)[^\s]*',
+            '[BLOCKED:INTERNAL_URL]', result
+        )
+        # Remove backtick and $() command substitutions
+        result = _re.sub(r'`[^`]+`', '[REMOVED:CMD]', result)
+        result = _re.sub(r'\$\([^)]+\)', '[REMOVED:CMD]', result)
+        # Strip path traversal sequences
+        result = _re.sub(r'(?:\.\./){2,}|(?:\.\.\\){2,}', '', result)
+        return result

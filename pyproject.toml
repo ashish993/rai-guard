@@ -40,6 +40,12 @@ ml = [
     "transformers>=4.40.0",
     "torch>=2.2.0",
     "detoxify>=0.5.2",
+    "sentence-transformers>=3.0.0",
+    "optimum[onnxruntime]>=1.18.0",   # ONNX Runtime backend for ProtectAI injection check
+    "accelerate>=0.28.0",              # device_map support for Granite Guardian 2B
+]
+llm = [
+    "openai>=1.30.0",
 ]
 dev = [
     "pytest>=8.0.0",
@@ -47,7 +53,7 @@ dev = [
     "httpx>=0.27.0",
 ]
 full = [
-    "raiguard[ml]",
+    "raiguard[ml,llm]",
 ]
 
 [project.scripts]

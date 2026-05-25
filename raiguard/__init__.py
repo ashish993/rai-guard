@@ -8,6 +8,10 @@ Usage:
 
 from raiguard.instrument import instrument, AIGuard
 from raiguard.checks.base import CheckResult, Severity
+from raiguard.guard import Guard, OnFailAction, GuardValidationResult, GuardValidationError
 
-__all__ = ["instrument", "AIGuard", "CheckResult", "Severity"]
+__all__ = [
+    "instrument", "AIGuard", "CheckResult", "Severity",
+    "Guard", "OnFailAction", "GuardValidationResult", "GuardValidationError",
+]
 __version__ = "0.1.0"

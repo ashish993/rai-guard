@@ -42,6 +42,12 @@ from raiguard.checks.pii import PIICheck
 from raiguard.checks.toxicity import ToxicityCheck
 from raiguard.checks.hallucination import HallucinationCheck
 from raiguard.checks.insecure_output import InsecureOutputCheck
+from raiguard.checks.llm_intent import LLMIntentCheck
+from raiguard.checks.local_intent import LocalIntentCheck
+from raiguard.checks.hap import GraniteHAPCheck
+from raiguard.checks.injection_ml import ProtectAIInjectionCheck
+from raiguard.checks.granite_guardian import GraniteGuardianCheck
+from raiguard.checks.semantic_similarity import SemanticSimilarityCheck
 
 
 @dataclass
@@ -108,7 +114,11 @@ class AIGuard:
         Optional EvidenceStore instance for audit logging.
     """
 
-    _ALL_CHECKS = ["prompt_injection", "pii", "toxicity", "hallucination", "insecure_output"]
+    _ALL_CHECKS = [
+        "prompt_injection", "pii", "toxicity", "hallucination", "insecure_output",
+        "llm_intent", "local_intent",
+        "hap", "injection_ml", "granite_guardian", "semantic_similarity",
+    ]
 
     def __init__(
         self,
@@ -137,14 +147,69 @@ class AIGuard:
         if "hallucination" in enabled:
             self._output_checks.append(HallucinationCheck())
         if "insecure_output" in enabled:
+            self._input_checks.append(InsecureOutputCheck())
             self._output_checks.append(InsecureOutputCheck())
+        if "llm_intent" in enabled:
+            # Single instance shared — LLMIntentCheck is stateless
+            _llm = LLMIntentCheck()
+            self._input_checks.append(_llm)
+            self._output_checks.append(_llm)
+        if "local_intent" in enabled:
+            # Single instance — pipeline is loaded lazily and cached globally
+            _local = LocalIntentCheck()
+            self._input_checks.append(_local)
+            self._output_checks.append(_local)
+        if "hap" in enabled:
+            # IBM Granite HAP-38M — disabled by default (opt-in via RAI_HAP_ENABLED)
+            _hap = GraniteHAPCheck()
+            self._input_checks.append(_hap)
+            self._output_checks.append(_hap)
+        if "injection_ml" in enabled:
+            # ProtectAI DeBERTa injection — disabled by default (opt-in via RAI_INJECTION_ML_ENABLED)
+            _inj_ml = ProtectAIInjectionCheck()
+            self._input_checks.append(_inj_ml)
+            self._output_checks.append(_inj_ml)
+        if "granite_guardian" in enabled:
+            # Granite Guardian 2B — disabled by default (opt-in via RAI_GRANITE_GUARDIAN_ENABLED)
+            _gg = GraniteGuardianCheck()
+            self._input_checks.append(_gg)
+            self._output_checks.append(_gg)
+        if "semantic_similarity" in enabled:
+            # Semantic similarity adversarial check — disabled by default (opt-in via RAI_SEMSIM_ENABLED)
+            _semsim = SemanticSimilarityCheck()
+            self._input_checks.append(_semsim)
 
-    async def check_input(self, text: str, session_id: str | None = None) -> GuardResult:
-        """Run all input checks against a prompt (concurrent, thread-pool)."""
+    async def check_input(
+        self,
+        text: str,
+        session_id: str | None = None,
+        history: list[dict[str, str]] | None = None,
+    ) -> GuardResult:
+        """Run all input checks against a prompt (concurrent, thread-pool).
+
+        Parameters
+        ----------
+        text:
+            The latest user message.
+        session_id:
+            Stable identifier for the conversation session.  Used for audit
+            logging and — when a ConversationBuffer is attached — history lookup.
+        history:
+            Optional list of prior turns in ``[{"role": ..., "content": ...}]``
+            format.  Passed to checks that are context-aware (e.g. LLMIntentCheck).
+            When omitted, only the current ``text`` is checked.
+        """
         session_id = session_id or str(uuid.uuid4())
+        context: dict[str, Any] = {"history": history or []}
         loop = asyncio.get_running_loop()
         raw = await asyncio.gather(
-            *[loop.run_in_executor(_executor, c.check_input, text) for c in self._input_checks],
+            *[
+                loop.run_in_executor(
+                    _executor,
+                    functools.partial(c.check_input, text, context),
+                )
+                for c in self._input_checks
+            ],
             return_exceptions=True,
         )
         results = []
@@ -158,12 +223,24 @@ class AIGuard:
                 results.append(r)
         return self._evaluate(results, session_id, direction="input")
 
-    async def check_output(self, text: str, session_id: str | None = None) -> GuardResult:
+    async def check_output(
+        self,
+        text: str,
+        session_id: str | None = None,
+        history: list[dict[str, str]] | None = None,
+    ) -> GuardResult:
         """Run all output checks against an LLM response (concurrent, thread-pool)."""
         session_id = session_id or str(uuid.uuid4())
+        context: dict[str, Any] = {"history": history or []}
         loop = asyncio.get_running_loop()
         raw = await asyncio.gather(
-            *[loop.run_in_executor(_executor, c.check_output, text) for c in self._output_checks],
+            *[
+                loop.run_in_executor(
+                    _executor,
+                    functools.partial(c.check_output, text, "", context),
+                )
+                for c in self._output_checks
+            ],
             return_exceptions=True,
         )
         results = []

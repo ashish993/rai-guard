@@ -23,15 +23,67 @@ Most AI safety tools are either static scanners or conversation-level guardrails
 
 ---
 
-## Checks Implemented
+## Validator Hub — 33 Pure-Python Validators
 
-| Check | OWASP | EU AI Act | Description |
-|-------|-------|-----------|-------------|
-| Prompt Injection | LLM01 | Art. 9, 15 | Jailbreaks, instruction overrides, role hijacking |
-| PII Detection | LLM06 | Art. 10, 13 | SSN, credit cards, passports, API keys, emails |
-| Toxicity | LLM02 | Art. 9, 13 | Hate speech, violence, self-harm, harassment |
-| Hallucination Risk | LLM09 | Art. 9, 13, 14 | Fabrication signals, false citations, overconfidence |
-| Insecure Output | LLM02 | Art. 9, 15 | SQL injection, XSS, shell injection, SSRF in LLM output |
+The built-in Hub ships **33 validators** across 3 categories, all with zero external API calls.
+
+### Core Checks (5)
+
+| Validator | OWASP | EU AI Act | Description |
+|-----------|-------|-----------|-------------|
+| `PromptInjection` | LLM01 | Art. 9, 15 | Jailbreaks, instruction overrides, role hijacking |
+| `PIIDetector` | LLM06 | Art. 10, 13 | SSN, credit cards, passports, API keys, emails — with `fix()` |
+| `ToxicLanguage` | LLM02 | Art. 9, 13 | Hate speech, violence, self-harm, harassment — with `fix()` |
+| `HallucinationRisk` | LLM09 | Art. 9, 13, 14 | Fabrication signals, false citations, overconfidence |
+| `InsecureOutput` | LLM02 | Art. 9, 15 | SQL injection, XSS, shell injection, SSRF — with `fix()` |
+
+### Format Validators (15)
+
+| Validator | Description | Has `fix()` |
+|-----------|-------------|-------------|
+| `ValidJSON` | Output is parseable JSON | — |
+| `ValidHTML` | Output is parseable HTML | — |
+| `ValidSQL` | SQL syntax valid (SQLite) | — |
+| `ValidPython` | Python code syntax valid | — |
+| `ValidURL` | Output is a valid URL | — |
+| `ValidLength` | Character count within `min_length`/`max_length` | — |
+| `ValidChoices` | Output is one of allowed choices | — |
+| `RegexMatch` | Output matches a regular expression | — |
+| `ContainsString` | Output contains required substring | — |
+| `EndsWith` | Output ends with a given suffix | — |
+| `OneLine` | Output is a single line | ✅ collapses to one line |
+| `ReadingTime` | Reading time ≤ `max_minutes` at 238 WPM | — |
+| `Uppercase` | Output is entirely uppercase | ✅ `.upper()` |
+| `Lowercase` | Output is entirely lowercase | ✅ `.lower()` |
+| `TwoWords` | Output is exactly two words | — |
+
+### Content Validators (7)
+
+| Validator | OWASP | Description | Has `fix()` |
+|-----------|-------|-------------|-------------|
+| `CompetitorCheck` | LLM09 | Flags competitor brand mentions | ✅ removes sentences |
+| `BanList` | LLM08 | Blocks banned words | ✅ replaces with `[FILTERED]` |
+| `RedundantSentences` | — | Detects duplicate sentences (Jaccard similarity) | ✅ deduplicates |
+| `SensitiveTopic` | LLM08 | Politics, religion, health, finance, violence, drugs | — |
+| `ProfanityFree` | LLM08 | Profanity and explicit language | ✅ asterisk censoring |
+| `BiasCheck` | LLM08 | Gender, age, ethnic, religious, disability bias | — |
+| `ReadingLevel` | — | Flesch-Kincaid grade range check | — |
+
+Use any validator in a composable `Guard` chain:
+
+```python
+from raiguard import Guard, OnFailAction
+from raiguard.hub import ValidJSON, BanList, SensitiveTopic
+
+guard = (
+    Guard()
+    .use(ValidJSON, on_fail=OnFailAction.EXCEPTION)
+    .use(BanList, banned_words=["confidential", "internal"], on_fail=OnFailAction.FIX)
+    .use(SensitiveTopic, on_fail=OnFailAction.BLOCK)
+)
+
+result = guard.validate('{"answer": "Here is confidential data"}')
+```
 
 ---
 

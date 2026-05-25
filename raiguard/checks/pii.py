@@ -40,15 +40,29 @@ _PII_PATTERNS: list[tuple[str, str, Severity, str]] = [
     (r"\b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b",
      "email", Severity.MEDIUM, "medium"),
 
-    # Medical
+    # Medical — require label:value separator to avoid false positives on common words
     (r"\b(?:patient\s+id|mrn|medical\s+record(?:\s+number)?)\s*:?\s*[A-Z0-9\-]{4,}\b",
      "medical_record", Severity.CRITICAL, "high"),
-    (r"\b(?:diagnosis|prescribed|medication|dosage)\s*:?\s*[a-zA-Z0-9\s,]+\b",
+    (r"\b(?:diagnosis|prescribed|medication|dosage)\s*:\s*[a-zA-Z0-9\s,]+\b",
      "medical_info", Severity.HIGH, "medium"),
 
     # Technical secrets
     (r"\b(?:sk-|pk_live_|rk_live_|sk_live_)[a-zA-Z0-9]{20,}\b",
      "api_key_stripe_openai", Severity.CRITICAL, "high"),
+    # Tokens — JWT / session / bearer / refresh
+    (r"(?i)(?:session\s+token|refresh\s+token|bearer\s+token|auth(?:orization)?\s+token)\s*:\s*[a-zA-Z0-9._\-]{16,}",
+     "token_in_text", Severity.CRITICAL, "high"),
+    (r"eyJ[a-zA-Z0-9_\-]{10,}\.[a-zA-Z0-9_\-]{3,}\.[a-zA-Z0-9_\-]{3,}",
+     "jwt_token", Severity.CRITICAL, "high"),
+    # Authorization: Bearer <token>
+    (r"(?i)\b(authorization|auth)\s*:\s*bearer\s+[A-Za-z0-9._\-]{10,}",
+     "bearer_token_in_header", Severity.CRITICAL, "high"),
+    # OTP
+    (r"(?i)\b(?:otp|one.time.pass(?:word|code)|one.time\s+pin)\s+(?:is|:)\s*[0-9]{4,8}\b",
+     "otp_value", Severity.HIGH, "high"),
+    # Encryption key
+    (r"(?i)(?:encryption\s+key|aes\s*\d{3}\s*:\s*)[a-zA-Z0-9+/=]{12,}",
+     "encryption_key", Severity.CRITICAL, "high"),
     (r"\b(?:ghp_|gho_|ghu_|ghs_|ghr_)[a-zA-Z0-9]{36}\b",
      "github_token", Severity.CRITICAL, "high"),
     (r"\b(?:AKIA|AGPA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}\b",
@@ -64,7 +78,7 @@ _PII_PATTERNS: list[tuple[str, str, Severity, str]] = [
 
     # Location
     (r"\b\d{1,5}\s+[a-zA-Z0-9\s,\.]+(?:street|st|avenue|ave|road|rd|boulevard|blvd|drive|dr|lane|ln|court|ct|way|wy)\b",
-     "street_address", Severity.LOW, "low"),
+     "street_address", Severity.MEDIUM, "medium"),
     (r"\b\d{5}(?:[-\s]\d{4})?\b",
      "zip_code_us", Severity.LOW, "low"),
 
@@ -157,3 +171,30 @@ class PIICheck(BaseCheck):
                 "of unnecessary personal data."
             ),
         )
+
+    def fix(self, text: str) -> str:
+        """Redact all detected PII patterns from text, replacing with [REDACTED:TYPE] tokens."""
+        # Collect all non-overlapping spans with highest-severity label
+        spans: list[tuple[int, int, str]] = []
+        for compiled, label, _sev, _risk in _COMPILED_PII:
+            for m in compiled.finditer(text):
+                spans.append((m.start(), m.end(), label))
+        if not spans:
+            return text
+
+        # Sort by start position, then by length descending (prefer longer matches)
+        spans.sort(key=lambda x: (x[0], -(x[1] - x[0])))
+
+        # Remove overlapping spans (keep first/longest at each position)
+        merged: list[tuple[int, int, str]] = []
+        last_end = -1
+        for start, end, label in spans:
+            if start >= last_end:
+                merged.append((start, end, label))
+                last_end = end
+
+        # Apply replacements right-to-left to preserve offsets
+        result = text
+        for start, end, label in reversed(merged):
+            result = result[:start] + f"[REDACTED:{label.upper()}]" + result[end:]
+        return result

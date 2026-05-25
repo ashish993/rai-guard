@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import uuid
 from typing import Any
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
@@ -21,6 +22,7 @@ from starlette.responses import JSONResponse, Response
 from starlette.types import ASGIApp
 
 from raiguard.instrument import AIGuard
+from raiguard.conversation import ConversationBuffer, get_default_buffer
 
 # Maximum request body to buffer in memory (default 1 MB)
 MAX_BODY_BYTES = int(os.getenv("RAI_MAX_BODY_BYTES", str(1 * 1024 * 1024)))
@@ -32,6 +34,25 @@ class AIGuardMiddleware(BaseHTTPMiddleware):
     and response bodies for policy violations.
 
     Intercepts JSON bodies with a 'prompt', 'content', or 'messages' key.
+
+    Multi-turn context
+    ------------------
+    Each request is associated with a *session ID* resolved from (in order):
+      1. ``X-Session-ID`` request header
+      2. ``session_id`` JSON body field
+      3. A new UUID (first turn; returned in the 400 response as ``session_id``)
+
+    Prior turns are stored in a ``ConversationBuffer`` and passed to all
+    context-aware checks (LLMIntentCheck, etc.) on each new request.
+
+    Parameters
+    ----------
+    conversation_buffer:
+        Provide a custom ``ConversationBuffer`` (e.g. backed by Redis).
+        Defaults to the module-level singleton from ``raiguard.conversation``.
+    track_assistant_responses:
+        When True (default) the middleware records assistant responses in the
+        buffer so checks see the full alternating user/assistant history.
     """
 
     def __init__(
@@ -42,6 +63,9 @@ class AIGuardMiddleware(BaseHTTPMiddleware):
         score_threshold: float = 0.7,
         store: Any | None = None,
         inspect_fields: list[str] | None = None,
+        conversation_buffer: ConversationBuffer | None = None,
+        track_assistant_responses: bool = True,
+        exclude_paths: list[str] | None = None,
     ) -> None:
         super().__init__(app)
         self.guard = AIGuard(
@@ -51,8 +75,15 @@ class AIGuardMiddleware(BaseHTTPMiddleware):
             store=store,
         )
         self.inspect_fields = inspect_fields or ["prompt", "content", "text", "input", "query"]
+        self._buffer: ConversationBuffer = conversation_buffer or get_default_buffer()
+        self._track_assistant = track_assistant_responses
+        self._exclude_paths: set[str] = set(exclude_paths or [])
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        # Skip inspection for excluded paths
+        if request.url.path in self._exclude_paths:
+            return await call_next(request)
+
         # Only inspect POST/PUT with JSON body
         if request.method in ("POST", "PUT") and "application/json" in request.headers.get("content-type", ""):
             try:
@@ -72,7 +103,23 @@ class AIGuardMiddleware(BaseHTTPMiddleware):
             prompt_text = self._extract_text(body)
 
             if prompt_text:
-                result = await self.guard.check_input(prompt_text)
+                # Resolve session ID: header > body field > new UUID
+                session_id = (
+                    request.headers.get("x-session-id")
+                    or (body.get("session_id") if isinstance(body, dict) else None)
+                    or str(uuid.uuid4())
+                )
+
+                # Retrieve prior turns from the buffer
+                history = self._buffer.get_history(session_id)
+
+                # Record the current user turn before running checks so that
+                # the LLM classifier sees it as part of the history window too.
+                self._buffer.add_turn(session_id, role="user", content=prompt_text)
+
+                result = await self.guard.check_input(
+                    prompt_text, session_id=session_id, history=history
+                )
                 if not result.allowed:
                     return JSONResponse(
                         status_code=400,
@@ -84,6 +131,10 @@ class AIGuardMiddleware(BaseHTTPMiddleware):
                             "remediation": self._remediation(result),
                         },
                     )
+
+                # Stash session_id on request state so the route handler can
+                # echo it back in the response if desired.
+                request.state.rai_session_id = session_id
 
         response = await call_next(request)
 
@@ -109,7 +160,13 @@ class AIGuardMiddleware(BaseHTTPMiddleware):
                 resp_text = self._extract_text(resp_body)
 
                 if resp_text:
-                    out_result = await self.guard.check_output(resp_text)
+                    # Retrieve session state stored earlier in this request cycle
+                    session_id: str | None = getattr(getattr(request, "state", None), "rai_session_id", None)
+                    history = self._buffer.get_history(session_id) if session_id else []
+
+                    out_result = await self.guard.check_output(
+                        resp_text, session_id=session_id, history=history
+                    )
                     if not out_result.allowed:
                         return JSONResponse(
                             status_code=500,
@@ -119,6 +176,10 @@ class AIGuardMiddleware(BaseHTTPMiddleware):
                                 "risk_score": out_result.risk_score,
                             },
                         )
+
+                    # Record assistant response in conversation buffer
+                    if self._track_assistant and session_id:
+                        self._buffer.add_turn(session_id, role="assistant", content=resp_text)
 
                 # Re-stream the body
                 return Response(

@@ -239,3 +239,196 @@ def check_cmd(text: str, json_output: bool) -> None:
             click.echo(f"  blocked by: {', '.join(result.blocked_by)}")
 
     sys.exit(1 if result.blocked_by else 0)
+
+
+# ── hub ───────────────────────────────────────────────────────────────────────
+
+@main.group()
+def hub() -> None:
+    """Browse and manage the rai-guard validator Hub.\n
+    \b
+    Examples:
+      raiguard hub list
+      raiguard hub list --risk-category jailbreaking
+      raiguard hub info raiguard/pii_detector
+      raiguard hub install raiguard/pii_detector
+      raiguard hub generate raiguard/prompt_injection raiguard/pii_detector
+    """
+
+
+@hub.command(name="list")
+@click.option("--risk-category", "-r", default=None, help="Filter by risk category (e.g. JAILBREAKING)")
+@click.option("--use-case", "-u", default=None, help="Filter by use case (e.g. RAG)")
+@click.option("--infra", "-i", default=None, help="Filter by infra type: RULE | ML | LLM")
+@click.option("--available-only", is_flag=True, default=False, help="Show only validators with deps installed")
+@click.option("--query", "-q", default=None, help="Search by name/description")
+def hub_list(risk_category, use_case, infra, available_only, query) -> None:
+    """List available validators in the Hub."""
+    from raiguard.hub import search
+
+    validators = search(
+        risk_category=risk_category,
+        use_case=use_case,
+        infra=infra,
+        available_only=available_only,
+        query=query,
+    )
+
+    if not validators:
+        _print("[yellow]No validators match the given filters.[/yellow]", "")
+        return
+
+    if _RICH and console:
+        table = Table(show_header=True, header_style="bold cyan", title=f"rai-guard Hub — {len(validators)} validators")
+        table.add_column("ID", style="bold", no_wrap=True)
+        table.add_column("Name")
+        table.add_column("Risk Category")
+        table.add_column("Infra")
+        table.add_column("OWASP")
+        table.add_column("Status")
+
+        for v in validators:
+            status = "[green]✓ Available[/green]" if v.available else f"[dim]needs: pip install raiguard[{v.requires_extra}][/dim]"
+            table.add_row(
+                v.id,
+                v.name,
+                ", ".join(v.risk_category),
+                v.infra,
+                ", ".join(v.owasp_refs),
+                status,
+            )
+        console.print(table)
+        console.print(f"\n[dim]Use [bold]raiguard hub info <id>[/bold] for details and usage examples.[/dim]")
+    else:
+        for v in validators:
+            avail = "✓" if v.available else f"[needs: {v.requires_extra}]"
+            click.echo(f"{v.id:<40} {v.name:<35} {v.infra:<6} {avail}")
+
+
+@hub.command(name="info")
+@click.argument("validator_id")
+def hub_info(validator_id: str) -> None:
+    """Show detailed information about a validator."""
+    from raiguard.hub import get
+
+    meta = get(validator_id)
+    if meta is None:
+        _print(f"[red]Validator not found:[/red] {validator_id}", "")
+        _print("Run [bold]raiguard hub list[/bold] to see all available validators.", "dim")
+        sys.exit(1)
+
+    if _RICH and console:
+        from rich.panel import Panel
+        from rich.syntax import Syntax
+
+        avail_str = "[green]✓ Installed[/green]" if meta.available else f"[yellow]⚠ Requires: pip install raiguard[{meta.requires_extra}][/yellow]"
+
+        info = (
+            f"[bold]{meta.name}[/bold]  v{meta.version}  by {meta.author}\n\n"
+            f"{meta.description}\n\n"
+            f"[dim]ID:[/dim]            {meta.id}\n"
+            f"[dim]Install:[/dim]       {meta.install_id}\n"
+            f"[dim]Status:[/dim]        {avail_str}\n"
+            f"[dim]Infra:[/dim]         {meta.infra}\n"
+            f"[dim]Risk Category:[/dim] {', '.join(meta.risk_category)}\n"
+            f"[dim]Use Cases:[/dim]     {', '.join(meta.use_cases)}\n"
+            f"[dim]Content Types:[/dim] {', '.join(meta.content_types)}\n"
+            f"[dim]OWASP:[/dim]         {', '.join(meta.owasp_refs)}\n"
+            f"[dim]EU AI Act:[/dim]     {', '.join(meta.eu_ai_act_refs)}\n"
+            f"[dim]NIST:[/dim]          {', '.join(meta.nist_refs)}\n"
+        )
+        console.print(Panel(info, title=f"[bold cyan]rai-guard Hub[/bold cyan] — {meta.id}"))
+
+        if meta.example_code:
+            console.print("\n[bold]Example usage:[/bold]")
+            console.print(Syntax(meta.example_code, "python", theme="monokai", line_numbers=False))
+    else:
+        click.echo(f"ID:          {meta.id}")
+        click.echo(f"Name:        {meta.name}")
+        click.echo(f"Description: {meta.description}")
+        click.echo(f"Infra:       {meta.infra}")
+        click.echo(f"OWASP:       {', '.join(meta.owasp_refs)}")
+        click.echo(f"Available:   {meta.available}")
+        if meta.example_code:
+            click.echo(f"\nExample:\n{meta.example_code}")
+
+
+@hub.command(name="install")
+@click.argument("validator_id")
+def hub_install(validator_id: str) -> None:
+    """Install a validator (check availability / show pip command if needed)."""
+    from raiguard.hub import get
+
+    meta = get(validator_id)
+    if meta is None:
+        _print(f"[red]Unknown validator:[/red] {validator_id}", "")
+        sys.exit(1)
+
+    if meta.available:
+        _print(f"[green]✓ {meta.name}[/green] is already available.", "")
+        _print(f"\nUse it in your code:\n", "")
+        if meta.example_code and _RICH and console:
+            from rich.syntax import Syntax
+            console.print(Syntax(meta.example_code, "python", theme="monokai"))
+        elif meta.example_code:
+            click.echo(meta.example_code)
+    else:
+        extra = meta.requires_extra or "ml"
+        _print(f"[yellow]{meta.name}[/yellow] requires additional dependencies.", "")
+        _print(f"\nInstall with:", "")
+        if _RICH and console:
+            from rich.syntax import Syntax
+            console.print(Syntax(f'pip install "raiguard[{extra}]"', "bash", theme="monokai"))
+        else:
+            click.echo(f'  pip install "raiguard[{extra}]"')
+
+
+@hub.command(name="generate")
+@click.argument("validator_ids", nargs=-1, required=True)
+@click.option("--on-fail", default="BLOCK", help="Default OnFailAction: BLOCK | EXCEPTION | FIX | NOOP")
+@click.option("--guard-name", default="my_guard", help="Variable name for the Guard")
+def hub_generate(validator_ids: tuple, on_fail: str, guard_name: str) -> None:
+    """Generate Guard code for the selected validators.\n
+    \b
+    Example:
+      raiguard hub generate raiguard/prompt_injection raiguard/pii_detector --on-fail EXCEPTION
+    """
+    from raiguard.hub import get, REGISTRY
+
+    imports = ["from raiguard import Guard, OnFailAction"]
+    hub_imports = []
+    uses = []
+    missing = []
+
+    for vid in validator_ids:
+        meta = get(vid)
+        if meta is None:
+            _print(f"[red]Unknown validator:[/red] {vid} — skipping", "")
+            missing.append(vid)
+            continue
+        cls_name = meta.check_class.__name__ if meta.check_class else meta.name.replace(" ", "")
+        hub_imports.append(cls_name)
+        uses.append(f"    .use({cls_name}, on_fail=OnFailAction.{on_fail.upper()})")
+
+    if not hub_imports:
+        _print("[red]No valid validators specified.[/red]", "")
+        sys.exit(1)
+
+    imports.append(f"from raiguard.hub import {', '.join(hub_imports)}")
+
+    lines = imports + ["", f"{guard_name} = (", "    Guard()"] + uses + [")", ""]
+    lines.append(f'result = {guard_name}.validate(user_prompt)')
+    lines.append(f'if not result.passed:')
+    lines.append(f'    print("Blocked:", result.violations)')
+
+    code = "\n".join(lines)
+
+    if _RICH and console:
+        from rich.syntax import Syntax
+        from rich.panel import Panel
+        console.print(Panel(
+            Syntax(code, "python", theme="monokai"),
+            title="[bold cyan]Generated Guard Code[/bold cyan]",
+        ))
+    else:
+        click.echo(code)
