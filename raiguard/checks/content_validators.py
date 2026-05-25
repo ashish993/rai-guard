@@ -207,6 +207,8 @@ class SensitiveTopicCheck(BaseCheck):
         ]),
         ("violence", [
             r"\b(kill|murder|assault|weapon|bomb|terrorist|shoot|stab|attack)\b",
+            r"\bbomb\s+blast\b",
+            r"\b(terror(?:ist)?\s+attack|suicide\s+bomb|blow\s+up|detonate)\b",
         ]),
         ("drugs", [
             r"\b(cocaine|heroin|fentanyl|methamphetamine|overdose|narcotic|illicit\s+drug)\b",

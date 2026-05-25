@@ -30,6 +30,14 @@ _TOXIC_CATEGORIES: dict[str, tuple[list[str], Severity]] = {
         r"\b(kill|murder|hurt|harm)\s+(one|a|the|that|this|some)\s+(guy|girl|person|man|woman|dude|bloke)\b",
         r"\bwant\s+to\s+(kill|murder|hurt|harm|attack|stab|shoot)\b",
         r"\b(how\s+to|ways?\s+to)\s+(get\s+away\s+with\s+)?(killing|murdering|hurting|harming|attacking)\s+(someone|a\s+person|people)\b",
+        # Terrorism / mass casualty threat language
+        r"\bbomb\s+blast\b",
+        r"\b(bomb|explosive|ied|suicide\s+bomb)\s+(attack|blast|detonat|explo)",
+        r"\b(terror(?:ist)?\s+attack|act\s+of\s+terror|terrorist\s+plot)",
+        r"\b(blow\s+up|detonate|plant\s+(a\s+)?bomb|set\s+off\s+(a\s+)?bomb)",
+        r"\b(there\s+will\s+be|will\s+be\s+a|there\s+is\s+a|going\s+to\s+be\s+a)\s+(bomb|explosion|blast|attack|shooting)\b",
+        r"\b(car\s+bomb|pipe\s+bomb|nail\s+bomb|suicide\s+vest|suicide\s+bomb)",
+        r"\b(kill|murder|attack|bomb|shoot)\s+(civilians?|innocent\s+people|crowd|public|city|town)",
     ], Severity.CRITICAL),
 
     "self_harm": ([
