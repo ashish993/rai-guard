@@ -17,6 +17,9 @@ _TOXIC_CATEGORIES: dict[str, tuple[list[str], Severity]] = {
         r"\b(kill|murder|exterminate|genocide)\s+(all\s+)?(jews?|muslims?|blacks?|whites?|gays?|women|men)\b",
         r"\b(n[i1][g9]{2}[e3]r|f[a4][g9]{2}[o0]t|ch[i1]nk|sp[i1][c])\b",
         r"\bwhite\s+supremac|ethnic\s+cleansing|racial\s+purity\b",
+        r"\ball\s+[\w\s\[\]]+\s+are\s+(subhuman|inferior|vermin|garbage|trash|criminals?|evil|terrorist)\b",
+        r"\b(ethnic|racial|religious)\s+(group|minority|community)\s+(is|are)\s+(subhuman|inferior|worthless)\b",
+        r"\b(white\s+supremacy|ethnic\s+cleansing|racial\s+purity|racial\s+supremacy|master\s+race|genocide)\b",
     ], Severity.CRITICAL),
 
     "violence": ([
