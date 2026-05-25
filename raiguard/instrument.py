@@ -36,18 +36,19 @@ _executor = concurrent.futures.ThreadPoolExecutor(
 )
 atexit.register(_executor.shutdown, wait=True)
 
-from raiguard.checks.base import CheckResult, Severity
-from raiguard.checks.prompt_injection import PromptInjectionCheck
-from raiguard.checks.pii import PIICheck
-from raiguard.checks.toxicity import ToxicityCheck
-from raiguard.checks.hallucination import HallucinationCheck
-from raiguard.checks.insecure_output import InsecureOutputCheck
-from raiguard.checks.llm_intent import LLMIntentCheck
-from raiguard.checks.local_intent import LocalIntentCheck
-from raiguard.checks.hap import GraniteHAPCheck
-from raiguard.checks.injection_ml import ProtectAIInjectionCheck
-from raiguard.checks.granite_guardian import GraniteGuardianCheck
-from raiguard.checks.semantic_similarity import SemanticSimilarityCheck
+# These imports must follow the executor/atexit setup above
+from raiguard.checks.base import CheckResult, Severity  # noqa: E402
+from raiguard.checks.prompt_injection import PromptInjectionCheck  # noqa: E402
+from raiguard.checks.pii import PIICheck  # noqa: E402
+from raiguard.checks.toxicity import ToxicityCheck  # noqa: E402
+from raiguard.checks.hallucination import HallucinationCheck  # noqa: E402
+from raiguard.checks.insecure_output import InsecureOutputCheck  # noqa: E402
+from raiguard.checks.llm_intent import LLMIntentCheck  # noqa: E402
+from raiguard.checks.local_intent import LocalIntentCheck  # noqa: E402
+from raiguard.checks.hap import GraniteHAPCheck  # noqa: E402
+from raiguard.checks.injection_ml import ProtectAIInjectionCheck  # noqa: E402
+from raiguard.checks.granite_guardian import GraniteGuardianCheck  # noqa: E402
+from raiguard.checks.semantic_similarity import SemanticSimilarityCheck  # noqa: E402
 
 
 @dataclass

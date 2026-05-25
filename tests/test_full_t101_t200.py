@@ -7,7 +7,8 @@ Guard-level behaviour note:
   application-level authorization decisions — the guard passes them through
   (HTTP 200).  Tests below are labelled accordingly.
 """
-import sys, os
+import os
+import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "examples"))
 from fastapi_app import app
 from httpx import AsyncClient, ASGITransport

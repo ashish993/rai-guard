@@ -1,4 +1,3 @@
-import pytest
 from raiguard.checks.prompt_injection import PromptInjectionCheck
 from raiguard.checks.base import Severity
 

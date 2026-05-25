@@ -70,12 +70,6 @@ _TOXIC_CATEGORIES: dict[str, tuple[list[str], Severity]] = {
         r"\beveryone\s+(is|are)\s+(worthless|stupid|idiot|useless|pathetic|garbage|trash)\b",
     ], Severity.HIGH),
 
-    "hate_speech": ([
-        r"\ball\s+[\w\s\[\]]+\s+are\s+(subhuman|inferior|vermin|garbage|trash|criminals?|evil|terrorist)\b",
-        r"\b(ethnic|racial|religious)\s+(group|minority|community)\s+(is|are)\s+(subhuman|inferior|worthless)\b",
-        r"\b(white\s+supremacy|ethnic\s+cleansing|racial\s+purity|racial\s+supremacy|master\s+race|genocide)\b",
-    ], Severity.CRITICAL),
-
     "misinformation": ([
         r"\b(vaccines?\s+(cause|causes?|caused?)\s+autism)\b",
         r"\b(covid|coronavirus)\s+(is|was)\s+(a\s+)?(hoax|fake|planned|engineered)\b",

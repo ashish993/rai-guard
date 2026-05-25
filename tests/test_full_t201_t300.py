@@ -7,7 +7,8 @@ Guard-level behaviour note:
   may invoke is enforced elsewhere; those inputs appear as ALLOWED (200)
   from the guard's perspective.
 """
-import sys, os
+import os
+import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "examples"))
 from fastapi_app import app
 from httpx import AsyncClient, ASGITransport

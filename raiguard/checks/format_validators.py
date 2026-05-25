@@ -350,7 +350,7 @@ class OneLineCheck(BaseCheck):
         return self._validate(text)
 
     def _validate(self, text: str) -> CheckResult:
-        lines = [l for l in text.splitlines() if l.strip()]
+        lines = [ln for ln in text.splitlines() if ln.strip()]
         if len(lines) <= 1:
             return self._make_result(True, 0.0, Severity.LOW)
         return self._make_result(
@@ -361,7 +361,7 @@ class OneLineCheck(BaseCheck):
 
     def fix(self, text: str) -> str:
         """Collapse multi-line output to a single line."""
-        return " ".join(l.strip() for l in text.splitlines() if l.strip())
+        return " ".join(ln.strip() for ln in text.splitlines() if ln.strip())
 
 
 class ReadingTimeCheck(BaseCheck):

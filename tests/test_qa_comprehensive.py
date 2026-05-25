@@ -6,14 +6,12 @@ Covers: toxicity, hallucination, middleware HTTP layer, edge cases,
 """
 
 import pytest
-import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 
 from raiguard.checks.toxicity import ToxicityCheck
 from raiguard.checks.hallucination import HallucinationCheck
 from raiguard.checks.pii import PIICheck
 from raiguard.checks.insecure_output import InsecureOutputCheck
-from raiguard.checks.prompt_injection import PromptInjectionCheck
 from raiguard.instrument import AIGuard
 
 

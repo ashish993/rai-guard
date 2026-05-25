@@ -7,7 +7,8 @@ Guard-level behaviour note:
   allows safe inputs (HTTP 200) and blocks unsafe ones (HTTP 400), which
   in turn generates the corresponding audit events.
 """
-import sys, os
+import os
+import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "examples"))
 from fastapi_app import app
 from httpx import AsyncClient, ASGITransport

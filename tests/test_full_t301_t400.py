@@ -6,7 +6,8 @@ Guard-level behaviour note:
   only blocks inputs containing injection, toxicity, or PII violations.
   Normal transfer requests appear as ALLOWED (200) from the guard's view.
 """
-import sys, os
+import os
+import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "examples"))
 from fastapi_app import app
 from httpx import AsyncClient, ASGITransport

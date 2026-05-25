@@ -10,7 +10,7 @@ Focus: High-Risk AI systems (Annex III categories).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from raiguard.checks.base import CheckResult

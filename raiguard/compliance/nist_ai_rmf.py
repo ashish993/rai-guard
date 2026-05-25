@@ -8,7 +8,6 @@ GOVERN, MAP, MEASURE, MANAGE
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
 
 from raiguard.checks.base import CheckResult
 
@@ -73,7 +72,6 @@ def map_to_nist_ai_rmf(
     has_monitoring: bool = True,
 ) -> list[NISTFinding]:
     check_map = {r.check_name: r for r in check_results}
-    all_passed = all(r.passed for r in check_results)
     any_critical = any(r.score >= 0.8 for r in check_results)
 
     findings = []

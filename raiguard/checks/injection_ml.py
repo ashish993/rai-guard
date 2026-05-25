@@ -80,7 +80,6 @@ def _get_pipeline():
         # ── 1. Try ONNX Runtime (fast path) ──────────────────────────────
         if _USE_ONNX:
             try:
-                from optimum.onnxruntime import ORTModelForSequenceClassification  # noqa: F401
                 from transformers import AutoTokenizer, pipeline
 
                 tokenizer = AutoTokenizer.from_pretrained(_MODEL, subfolder="onnx")

@@ -24,8 +24,8 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 
 from raiguard.evidence.store import EvidenceStore
-from raiguard.compliance.owasp_llm import map_to_owasp, owasp_compliance_score
-from raiguard.compliance.eu_ai_act import map_to_eu_ai_act, eu_ai_act_overall_score
+from raiguard.compliance.owasp_llm import owasp_compliance_score
+from raiguard.compliance.eu_ai_act import eu_ai_act_overall_score
 
 logger = logging.getLogger("raiguard.dashboard")
 

@@ -7,7 +7,8 @@ Guard-level behaviour note:
   - Obfuscated attacks → ambiguous (200 or 400)
   - Repeated injections → blocked (400)
 """
-import sys, os
+import os
+import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "examples"))
 from fastapi_app import app
 from httpx import AsyncClient, ASGITransport

@@ -15,7 +15,8 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 
 # FastAPI app is one directory up from this tests/ folder
-import sys, os
+import os
+import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "examples"))
 from fastapi_app import app  # noqa: E402
 

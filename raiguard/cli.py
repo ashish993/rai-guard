@@ -21,8 +21,6 @@ import click
 try:
     from rich.console import Console
     from rich.table import Table
-    from rich.panel import Panel
-    from rich import print as rprint
     _RICH = True
 except ImportError:
     _RICH = False
@@ -100,7 +98,7 @@ def audit(text_or_file: str, checks: Optional[str], output: Optional[str], direc
     sys.exit(0 if result.allowed else 1)
 
 
-def _render_audit_result(result: "GuardResult", text_preview: str) -> None:  # type: ignore[name-defined]
+def _render_audit_result(result: "GuardResult", text_preview: str) -> None:  # type: ignore[name-defined]  # noqa: F821
     from rich.table import Table
     from rich.panel import Panel
 
@@ -191,9 +189,8 @@ def dashboard(host: str, port: int, db: str) -> None:
 def report(db: str, fmt: str, output: Optional[str]) -> None:
     """Generate a compliance evidence report from the audit database."""
     from raiguard.evidence.report import generate_html_report, generate_json_report, save_report
-    from raiguard.compliance.owasp_llm import owasp_compliance_score, OWASPFinding
-    from raiguard.compliance.eu_ai_act import eu_ai_act_overall_score, EUAIActFinding
-    from raiguard.compliance.nist_ai_rmf import NISTFinding
+    from raiguard.compliance.owasp_llm import owasp_compliance_score
+    from raiguard.compliance.eu_ai_act import eu_ai_act_overall_score
 
     # Build minimal empty reports (no live DB required for demo)
     owasp_score = owasp_compliance_score([])
@@ -232,7 +229,7 @@ def check_cmd(text: str, json_output: bool) -> None:
     else:
         # blocked_by is populated even when block_on_fail=False
         is_blocked = bool(result.blocked_by)
-        status = f"[red]BLOCKED[/red]" if is_blocked else f"[green]ALLOWED[/green]"
+        status = "[red]BLOCKED[/red]" if is_blocked else "[green]ALLOWED[/green]"
         risk_colour = "red" if result.risk_score >= 0.7 else "yellow" if result.risk_score >= 0.4 else "green"
         click.echo(f"{status} | risk=[{risk_colour}]{result.risk_score:.3f}[/{risk_colour}] | checks={len(result.check_results)}")
         if result.blocked_by:
@@ -298,7 +295,7 @@ def hub_list(risk_category, use_case, infra, available_only, query) -> None:
                 status,
             )
         console.print(table)
-        console.print(f"\n[dim]Use [bold]raiguard hub info <id>[/bold] for details and usage examples.[/dim]")
+        console.print("\n[dim]Use [bold]raiguard hub info <id>[/bold] for details and usage examples.[/dim]")
     else:
         for v in validators:
             avail = "✓" if v.available else f"[needs: {v.requires_extra}]"
@@ -366,7 +363,7 @@ def hub_install(validator_id: str) -> None:
 
     if meta.available:
         _print(f"[green]✓ {meta.name}[/green] is already available.", "")
-        _print(f"\nUse it in your code:\n", "")
+        _print("\nUse it in your code:\n", "")
         if meta.example_code and _RICH and console:
             from rich.syntax import Syntax
             console.print(Syntax(meta.example_code, "python", theme="monokai"))
@@ -375,7 +372,7 @@ def hub_install(validator_id: str) -> None:
     else:
         extra = meta.requires_extra or "ml"
         _print(f"[yellow]{meta.name}[/yellow] requires additional dependencies.", "")
-        _print(f"\nInstall with:", "")
+        _print("\nInstall with:", "")
         if _RICH and console:
             from rich.syntax import Syntax
             console.print(Syntax(f'pip install "raiguard[{extra}]"', "bash", theme="monokai"))
@@ -393,7 +390,7 @@ def hub_generate(validator_ids: tuple, on_fail: str, guard_name: str) -> None:
     Example:
       raiguard hub generate raiguard/prompt_injection raiguard/pii_detector --on-fail EXCEPTION
     """
-    from raiguard.hub import get, REGISTRY
+    from raiguard.hub import get
 
     imports = ["from raiguard import Guard, OnFailAction"]
     hub_imports = []
@@ -418,8 +415,8 @@ def hub_generate(validator_ids: tuple, on_fail: str, guard_name: str) -> None:
 
     lines = imports + ["", f"{guard_name} = (", "    Guard()"] + uses + [")", ""]
     lines.append(f'result = {guard_name}.validate(user_prompt)')
-    lines.append(f'if not result.passed:')
-    lines.append(f'    print("Blocked:", result.violations)')
+    lines.append('if not result.passed:')
+    lines.append('    print("Blocked:", result.violations)')
 
     code = "\n".join(lines)
 

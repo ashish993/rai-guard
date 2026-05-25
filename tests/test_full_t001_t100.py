@@ -2,7 +2,8 @@
 Tests T001–T100: Prompt Injection & Instruction Override
 New comprehensive test plan covering all injection attack categories.
 """
-import sys, os
+import os
+import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "examples"))
 from fastapi_app import app
 from httpx import AsyncClient, ASGITransport
